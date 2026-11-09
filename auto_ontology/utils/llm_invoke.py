@@ -221,20 +221,23 @@ def _build_client(
 ) -> BaseChatModel:
     """Build a chat client for the given model/endpoint.
 
-    OpenAI-family models (``openai/``, ``azure/``, ``aws/`` prefixes) go through
-    ``ChatOpenAI``, which supports structured output. Everything else uses
-    ``ChatNVIDIA``.
+    OpenAI-family models (``openai/``, ``azure/``, ``aws/`` prefixes) and the
+    official Anthropic API (``api.anthropic.com``, through Anthropic's OpenAI
+    SDK compatibility layer) go through ``ChatOpenAI``, which supports
+    structured output. Everything else uses ``ChatNVIDIA``.
     """
-    if model.startswith(("openai/", "azure/", "aws/")):
+    official_anthropic = "api.anthropic.com" in base_url
+    if model.startswith(("openai/", "azure/", "aws/")) or official_anthropic:
         from langchain_openai import ChatOpenAI
 
         return ChatOpenAI(
             model=model,
             api_key=api_key,
             base_url=base_url,
-            # temperature omitted: gpt-5.x/o-series reject any explicit value and
-            # only allow the server default (1). Unset => langchain sends no
-            # temperature field, so the provider default applies.
+            # temperature omitted: gpt-5.x/o-series and Claude 4.7+ reject any
+            # explicit value and only allow the server default. Unset =>
+            # langchain sends no temperature field, so the provider default
+            # applies.
             # temperature=temperature,
             max_tokens=max_tokens,
             timeout=LLM_INVOKE_TIMEOUT_S,

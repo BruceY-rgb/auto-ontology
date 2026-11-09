@@ -77,6 +77,68 @@ def test_a_client_exposing_model_instead_of_model_name_still_matches() -> None:
     assert _structured_output_kwargs(_AltModel())["tool_choice"] is None
 
 
+def test_the_official_anthropic_api_uses_chat_openai(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Anthropic's compatibility layer needs ChatOpenAI, not ChatNVIDIA.
+
+    ChatNVIDIA sends an explicit ``temperature``; Claude 4.7+ answers 400 to
+    any non-default sampling value. ChatOpenAI omits it, which is what makes
+    ``api.anthropic.com`` work.
+    """
+    import langchain_openai
+
+    captured: dict[str, Any] = {}
+    sentinel = MagicMock()
+
+    def fake_chat_openai(**kwargs: Any) -> Any:
+        captured.update(kwargs)
+        return sentinel
+
+    monkeypatch.setattr(langchain_openai, "ChatOpenAI", fake_chat_openai)
+
+    client = llm_invoke._build_client(
+        model="claude-opus-5-5",
+        api_key="sk-ant-test",
+        base_url="https://api.anthropic.com/v1",
+        temperature=0.0,
+        max_tokens=1024,
+    )
+
+    assert client is sentinel
+    assert captured["model"] == "claude-opus-5-5"
+    assert captured["base_url"] == "https://api.anthropic.com/v1"
+    assert "temperature" not in captured
+
+
+def test_other_endpoints_keep_chat_nvidia(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only the official Anthropic host switches away from ChatNVIDIA."""
+    import langchain_nvidia_ai_endpoints
+
+    captured: dict[str, Any] = {}
+    sentinel = MagicMock()
+
+    def fake_chat_nvidia(**kwargs: Any) -> Any:
+        captured.update(kwargs)
+        return sentinel
+
+    monkeypatch.setattr(langchain_nvidia_ai_endpoints, "ChatNVIDIA", fake_chat_nvidia)
+
+    client = llm_invoke._build_client(
+        model="nvidia/nemotron-3.5-lightning-30b-a3b",
+        api_key="nvapi-test",
+        base_url="https://integrate.api.nvidia.com/v1",
+        temperature=0.0,
+        max_tokens=1024,
+    )
+
+    assert client is sentinel
+    assert captured["base_url"] == "https://integrate.api.nvidia.com/v1"
+    assert captured["temperature"] == 0.0
+
+
 def _interleaved() -> list[BaseMessage]:
     """The shape sql_from_semantic sends: system, user, system, system, user."""
     return [

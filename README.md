@@ -422,6 +422,10 @@ that support structured output, and keep the embedding model the same for
 ingestion and queries. [`.env.example`](./.env.example) documents every
 variable.
 
+The official Anthropic API works through its OpenAI SDK compatibility layer:
+point a chat role at `https://api.anthropic.com/v1` with an `sk-ant-` key and a
+Claude model name. `EMBED` and `RERANK` still need another provider.
+
 ### Predictions
 
 Set `KUMO_RFM_API_KEY` and the agent routes predictive questions to KumoRFM.
